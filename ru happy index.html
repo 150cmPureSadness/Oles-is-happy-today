@@ -274,7 +274,7 @@ function drawHeart() {
 function spawnEnemy() {
     if (phase !== 1 || !gameRunning) return;
     const side = Math.floor(Math.random() * 4);
-    let ex, ey, vx, vy, speed = 1.5 + Math.random() * 1.2;
+    let ex, ey, vx, vy, speed = 0.5 + Math.random() * 0.5;
     switch (side) {
         case 0: ex = Math.random() * canvas.width; ey = -60; vx = (Math.random()-0.5)*1; vy = speed; break;
         case 1: ex = Math.random() * canvas.width; ey = canvas.height + 60; vx = (Math.random()-0.5)*1; vy = -speed; break;
@@ -377,4 +377,5 @@ function showLose() {
 </script>
 </body>
 </html>
+
 
