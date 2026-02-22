@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Хули читаешь?</title>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #000;
+            color: #fff;
+            font-family: 'Arial Black', Arial, sans-serif;
+            overflow: hidden;
+            cursor: none;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        #intro {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 20px;
+        }
+        #intro img {
+            max-width: 90%;
+            max-height: 65vh;
+            border: 8px solid #fff;
+            border-radius: 12px;
+            box-shadow: 0 0 40px #ff00ff;
+            cursor: pointer;
+            transition: transform 0.25s;
+        }
+        #intro img:hover { transform: scale(1.04); }
+        #intro h1 { font-size: 3rem; margin: 20px 0; text-shadow: 0 0 20px #ff0044; }
+        #intro p { font-size: 1.9rem; margin: 25px 0; max-width: 800px; }
+        #startBtn {
+            display: none;
+            font-size: 34px;
+            padding: 22px 70px;
+            background: #00ff44;
+            color: black;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            box-shadow: 0 0 50px #00ff44;
+            margin-top: 40px;
+        }
+        #startBtn:hover { transform: scale(1.12); }
+        #choiceBtns button {
+            font-size: 28px;
+            padding: 15px 60px;
+            margin: 0 30px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        #choiceBtns .yesBtn { background: #00ff44; color: black; box-shadow: 0 0 30px #00ff44; }
+        #choiceBtns .noBtn  { background: #ff4444; color: white; box-shadow: 0 0 30px #ff4444; }
+        canvas { display: none; }
+        .overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95); display: none; flex-direction: column;
+            align-items: center; justify-content: center; z-index: 200; text-align: center;
+            font-size: 2.5rem;
+        }
+        .overlay button { margin-top: 30px; padding: 15px 40px; font-size: 1.8rem; }
+    </style>
+</head>
+<body>
+    <div id="intro">
+        <h1></h1>
+        <p id="prompt">Кликни по картинке, чтобы продолжить...</p>
+        <img id="pinterestImg" src="" alt="Картинка 1">
+        <button id="startBtn" onclick="startGame()">Соснуть</button>
+        <!-- Контейнер для кнопок Да/Нет -->
+    </div>
+
+    <canvas id="c"></canvas>
+
+    <div id="winOverlay" class="overlay">
+        <h2 style="color: #FFD700; font-size: 5rem;">Легенда Броваров</h2>
+        <p>Ты смог пройти. Кста, нажми F в самом начале<br>Ладно, ещё раз поздравляю тебя Олесь)9 Держи пиво 🍺</p>
+        <button onclick="location.reload()" style="background: #00ff00;">Ещё раз?</button>
+    </div>
+
+    <div id="loseOverlay" class="overlay">
+        <h2 style="color: #ff0000; font-size: 4.5rem;">💀Ойй, опять?💀</h2>
+        <p id="loseText">Пробуй, это реально</p>
+        <button onclick="location.reload()" style="background: #ff0000;">Заново</button>
+    </div>
+
+<script>
+// Массивы картинок и текстов
+const pics = [
+    "https://i.imgur.com/b21R3Pw.jpeg",
+    "https://i.imgur.com/b21R3Pw.jpeg",
+    "https://i.imgur.com/b21R3Pw.jpeg",
+    "https://i.imgur.com/b21R3Pw.jpeg",
+    "https://i.imgur.com/b21R3Pw.jpeg",
+    "https://i.imgur.com/3ZoZ7fL.png"
+];
+const messages = [
+    "Привет...",
+    "Я хотел бы тебе сказать...",
+    "С Днём Рождения тебя",
+    "Ну а ещё..",
+    "Я тебе тут кое что приготовил",
+    "Тебе Пизда"
+];
+
+// Альтернативная ветка на F
+const fPics = [
+    "https://i.imgur.com/b21R3Pw.jpeg",
+    "https://i.imgur.com/b21R3Pw.jpeg",
+    "https://i.imgur.com/b21R3Pw.jpeg",
+    "https://i.imgur.com/3ZoZ7fL.png"
+];
+const fMessages = [
+    "Хм..",
+    "Вижу ты прошёл",
+    "Ну да ладно, хочу сказать тебе вот что...",
+    "Скинь ножки (F)"
+];
+
+// Ссылки для кнопок Да / Нет
+const yesLink = "https://i.pinimg.com/736x/10/ba/5b/10ba5ba4df4157da1f1aa81cae038a5f.jpg"; // 
+const noLink  = "https://i.pinimg.com/736x/ee/8e/f8/ee8ef8bbf97ca33898fedec2cfe8f88e.jpg"; // 
+
+let clickCount = 0;
+let isFBranch = false;
+let fClickCount = 0;
+
+const pinterestImg = document.getElementById('pinterestImg');
+const prompt = document.getElementById('prompt');
+const startBtn = document.getElementById('startBtn');
+
+// Показываем первую 
+pinterestImg.src = pics[0];
+prompt.textContent = messages[0];
+
+// Клик по картинке
+pinterestImg.addEventListener('click', () => {
+    if (isFBranch) {
+        // В ветке F далее
+        if (fClickCount < fPics.length - 1) {
+            fClickCount++;
+            pinterestImg.src = fPics[fClickCount];
+            prompt.textContent = fMessages[fClickCount];
+        }
+        // Кнопки Да/Нет появятся автоматически
+    } else {
+        // Обычная ветка
+        clickCount++;
+        if (clickCount < pics.length) {
+            pinterestImg.src = pics[clickCount];
+            prompt.textContent = messages[clickCount];
+        }
+        if (clickCount >= pics.length - 1) {
+            startBtn.style.display = 'block';
+            prompt.textContent = messages[messages.length - 1];
+        }
+    }
+});
+
+// Обработчик клавиш (F + R)
+document.addEventListener('keydown', (e) => {
+    if (e.key.toLowerCase() === 'r') {
+        location.reload();
+    }
+
+    if (!gameRunning && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+
+        if (!isFBranch) {
+            isFBranch = true;
+            fClickCount = 0;
+            pinterestImg.src = fPics[0];
+            prompt.textContent = fMessages[0];
+            startBtn.style.display = 'none'; // скрываем обычную кнопку
+        } else if (fClickCount < fPics.length - 1) {
+            fClickCount++;
+            pinterestImg.src = fPics[fClickCount];
+            prompt.textContent = fMessages[fClickCount];
+        }
+
+        // 2 кнопки
+        if (fClickCount >= fPics.length - 1) {
+            if (!document.getElementById('choiceBtns')) {
+                const choiceDiv = document.createElement('div');
+                choiceDiv.id = 'choiceBtns';
+                choiceDiv.style.marginTop = '40px';
+                choiceDiv.innerHTML = `
+                    <button class="yesBtn" onclick="window.open('${yesLink}', '_blank')">ДА</button>
+                    <button class="noBtn" onclick="window.open('${noLink}', '_blank')">НЕТ</button>
+                `;
+                document.getElementById('intro').appendChild(choiceDiv);
+            }
+            prompt.textContent = "Ну что, Да или Нет? 😈";
+        }
+    }
+});
+
+// ────────────────────────────────────────────────
+// Основа 
+// ────────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+let player = { x: 0, y: 0, r: 7 };
+let enemies = [];
+let beams = [];
+let gameRunning = false;
+let gameOver = false;
+let startTime = 0;
+let gameTime = 0;
+let phase = 1;
+let spawnInterval = null;
+
+const SWORD_PHASE = 20;
+const TOTAL_TIME = 45;
+const texts = ['', '', '', '', '', '', ''];
+
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+canvas.addEventListener('mousemove', (e) => {
+    if (!gameRunning) return;
+    const rect = canvas.getBoundingClientRect();
+    player.x = e.clientX - rect.left;
+    player.y = e.clientY - rect.top;
+});
+
+function drawSword(e) {
+    ctx.save();
+    const angle = Math.atan2(e.vy, e.vx) || 0;
+    ctx.fillStyle = '#4B2E1A'; ctx.fillRect(e.x - 4, e.y - 12, 8, 30);
+    ctx.strokeStyle = '#ddd'; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.shadowBlur = 15; ctx.shadowColor = '#fff';
+    ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x + 55 * Math.cos(angle), e.y + 55 * Math.sin(angle)); ctx.stroke();
+    ctx.fillStyle = '#eee'; ctx.beginPath(); ctx.moveTo(e.x + 52 * Math.cos(angle), e.y + 52 * Math.sin(angle));
+    ctx.lineTo(e.x + 65 * Math.cos(angle + 0.25), e.y + 65 * Math.sin(angle + 0.25)); ctx.lineTo(e.x + 65 * Math.cos(angle - 0.25), e.y + 65 * Math.sin(angle - 0.25)); ctx.fill();
+    ctx.fillStyle = '#f00'; ctx.font = 'bold 14px Arial'; ctx.textAlign = 'center';
+    ctx.fillText(texts[Math.floor(Math.random()*texts.length)], e.x + 22 * Math.cos(angle), e.y + 22 * Math.sin(angle));
+    ctx.restore();
+}
+
+function drawBeam(b) {
+    ctx.save();
+    ctx.fillStyle = '#8B4513'; ctx.shadowBlur = 20; ctx.shadowColor = '#ff8800';
+    ctx.fillRect(b.x, b.y, b.w, 40);
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 22px Arial'; ctx.textAlign = 'center';
+    ctx.fillText(b.text, b.x + b.w / 2, b.y + 25);
+    ctx.restore();
+}
+
+function drawHeart() {
+    ctx.save();
+    ctx.font = 'bold 40px Arial';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.shadowBlur = 40; ctx.shadowColor = '#ff00ff';
+    ctx.fillStyle = '#ff00ff';
+    ctx.fillText('❤️', player.x, player.y + 10);
+    ctx.restore();
+}
+
+function spawnEnemy() {
+    if (phase !== 1 || !gameRunning) return;
+    const side = Math.floor(Math.random() * 4);
+    let ex, ey, vx, vy, speed = 1.5 + Math.random() * 1.2;
+    switch (side) {
+        case 0: ex = Math.random() * canvas.width; ey = -60; vx = (Math.random()-0.5)*1; vy = speed; break;
+        case 1: ex = Math.random() * canvas.width; ey = canvas.height + 60; vx = (Math.random()-0.5)*1; vy = -speed; break;
+        case 2: ex = -60; ey = Math.random() * canvas.height; vx = speed; vy = (Math.random()-0.5)*1; break;
+        case 3: ex = canvas.width + 60; ey = Math.random() * canvas.height; vx = -speed; vy = (Math.random()-0.5)*1; break;
+    }
+    enemies.push({ x: ex, y: ey, vx, vy, r: 22 });
+}
+
+function spawnBeam() {
+    if (phase !== 2 || !gameRunning) return;
+    const x = Math.random() * (canvas.width - 1) + 1;
+    const w = 50 + Math.random() * 300;
+    const text = texts[Math.floor(Math.random() * texts.length)];
+    beams.push({ x, y: -60, w, text, speed: 6 + Math.random() * 15 });
+}
+
+function update() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (gameTime >= SWORD_PHASE && phase === 1) {
+        phase = 2;
+        clearInterval(spawnInterval);
+        enemies = [];
+        spawnInterval = setInterval(spawnBeam, 200);
+    }
+    if (phase === 1) {
+        for (let i = enemies.length - 1; i >= 0; i--) {
+            const e = enemies[i];
+            e.x += e.vx; e.y += e.vy;
+            e.vx += (player.x - e.x) * 0.001;
+            e.vy += (player.y - e.y) * 0.001;
+            drawSword(e);
+            if (Math.hypot(player.x - e.x, player.y - e.y) < player.r + e.r + 35) {
+                gameOver = true;
+                document.getElementById('loseText').textContent = 'Что со скиллом?';
+                showLose(); return;
+            }
+            if (e.x < -200 || e.x > canvas.width + 200 || e.y < -200 || e.y > canvas.height + 200) enemies.splice(i, 1);
+        }
+    }
+    if (phase === 2) {
+        for (let i = beams.length - 1; i >= 0; i--) {
+            const b = beams[i];
+            b.y += b.speed;
+            drawBeam(b);
+            if (player.y + player.r * 2.2 > b.y &&
+                player.y - player.r * 2.2 < b.y + 40 &&
+                player.x + player.r * 2.2 > b.x &&
+                player.x - player.r * 2.2 < b.x + b.w) {
+                gameOver = true;
+                document.getElementById('loseText').textContent = `Мне кажеться ты умер "${b.text}" `;
+                showLose(); return;
+            }
+            if (b.y > canvas.height + 100) beams.splice(i, 1);
+        }
+        ctx.fillStyle = '#ff4444'; ctx.font = 'bold 36px Arial'; ctx.textAlign = 'center';
+        ctx.fillText('Пук Пук', canvas.width / 2, 80);
+    }
+    drawHeart();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 40px Arial'; ctx.textAlign = 'left';
+    ctx.fillText(`Время: ${gameTime}s / ${TOTAL_TIME}`, 30, 60);
+    ctx.font = 'bold 28px Arial';
+    ctx.fillText(phase === 1 ? 'ФАЗА 1' : 'ФАЗА 2', 30, 110);
+    ctx.textAlign = 'center';
+    ctx.fillText('Двигай попой', canvas.width / 2, canvas.height - 40);
+    if (gameRunning && !gameOver) {
+        gameTime = Math.floor((Date.now() - startTime) / 1000);
+        if (gameTime >= TOTAL_TIME) {
+            gameOver = true;
+            showWin();
+            return;
+        }
+        requestAnimationFrame(update);
+    }
+}
+
+function startGame() {
+    document.getElementById('intro').style.display = 'none';
+    canvas.style.display = 'block';
+    gameRunning = true;
+    gameOver = false;
+    phase = 1;
+    startTime = Date.now();
+    gameTime = 0;
+    enemies = [];
+    beams = [];
+    resize();
+    update();
+    spawnInterval = setInterval(spawnEnemy, 680);
+}
+
+function showWin() {
+    confetti({ particleCount: 800, spread: 360, origin: { y: 0.6 } });
+    document.getElementById('winOverlay').style.display = 'flex';
+}
+
+function showLose() {
+    document.getElementById('loseOverlay').style.display = 'flex';
+}
+</script>
+</body>
+</html>
